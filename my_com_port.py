@@ -36,7 +36,7 @@ def  Selection_Port(port_list) :
         if (i.upper() == 'Q' or i.upper() == 'Й'):
             return port
 
-        if (len(i) > 1): continue;  # разные проверки на ввод
+        if (len(i) > 1): continue;  # разные проверки на ввод - # пропускаем строки длиннее 1 символа
         if (i not in my_strings.NUMERIC_STRING): continue;
 
         i = int(i)
@@ -45,3 +45,43 @@ def  Selection_Port(port_list) :
             break
     return port
 
+def Open_Port(port) :
+    try:
+        # Open the COM port
+        # SerPort = serial.Serial(port, baudrate=115000)
+        # print(" >> Порт открыт")
+
+        # keyboard.add_hotkey('q', on_exit)  # грячая клавиша для выхода
+        # keyboard.add_hotkey('ctrl + alt + x', lambda: print('ctrl + alt + x waspressed'))
+
+        with serial.Serial(port, baudrate=115000, timeout=1, exclusive=True) as ser:
+            print(f" >> Порт {ser.port} успешно открыт на {ser.baudrate} бод.")
+            # Здесь можно выполнять чтение и запись, например:
+            # ser.write(b'Hello')
+            # data = ser.readline()
+            # print(data)
+
+        # Блок 'with' автоматически закроет порт при выходе
+        print(f" >> Порт {port} закрыт.")
+
+    # 3. Обработка специфичных исключений pySerial
+    except serial.SerialException as e:
+        # Это "родительское" исключение для большинства проблем с портом[citation:3]
+        # Оно может означать:
+        # - Порт не существует[citation:5]
+        # - Отказано в доступе (порт уже открыт другим приложением)[citation:1][citation:6]
+        # # - Ошибка драйвера или оборудования[citation:5]
+        print(f"❌ Ошибка при открытии порта '{port}': {e}")
+
+        # Дополнительная диагностика для частой ошибки "отказано в доступе"
+        if "Access is denied" in str(e) or "PermissionError" in str(e):
+            print(
+                "   Совет: Убедитесь, что порт не используется другой программой (например, Arduino IDE, терминалом Putty).")
+
+    # 4. Обработка ошибок, связанных с таймаутом (например, при записи)
+    except serial.SerialTimeoutException as e:
+        print(f"❌ Операция с портом '{port}' превысила таймаут: {e}")
+
+
+    except Exception as e:
+        print(f"❌ Произошла непредвиденная ошибка: {e}")

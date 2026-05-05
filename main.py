@@ -3,7 +3,7 @@ import my_com_port
 import my_strings
 import threading
 import time
-
+import os
 
 
 VERSION_MY_PO = 'v.0.0.1  05.05.26'                                             # версия программы
@@ -24,7 +24,7 @@ class StoppableThread(threading.Thread):
             worker1(self.name, self.param, self.event, self.result)
             time.sleep(0.1)
             self.stop()                                                     # остановим поток
-        print(f'Поток завершился корректно')
+        print(f'Поток {self.name}: завершился корректно')
 
     def stop(self):
         self._stop_event.set()
@@ -44,7 +44,7 @@ def worker1(name, delay, event, result_container):
     #     print(f"Поток {name}: итерация {i}")
     #     time.sleep(delay)
 
-    print(f"Worker: {name}, {delay}, event: {event}, result: {result_container}")
+    # print(f"Worker: {name}, {delay}, event: {event}, result: {result_container}")
 
     print(f"Поток {name}: задержка {delay}")
     time.sleep(delay)
@@ -55,10 +55,17 @@ def worker1(name, delay, event, result_container):
     if not list_port:
         print("портов не обнаружено")
     NumPort = my_com_port.Selection_Port(list_port)
+    if not NumPort:
+        print("порт не выбран")
+        print("Завершаем процесс!")
+        time.sleep(3)
+        os._exit(0)  # Немедленно завершает весь процесс
     print("Выбран порт >> " + NumPort, end='')
 
+    my_com_port.Open_Port(NumPort)
+
     result_container['data'] = 42
-    print("Поток 1: работа завершена, данные готовы")
+    print(f"\nПоток {name}: работа завершена, данные готовы")
     event.set()  # Сигнализируем о готовности
 
 
@@ -68,9 +75,9 @@ def worker2(name, delay, event):
     """Функция, которая будет выполняться в потоке"""
 
     """Второй поток - ждет результат"""
-    print("Поток 2: ожидаю данные от потока 1...")
+    print(f"Поток {name}: ожидаю данные от потока 1...")
     event.wait()  # Блокируется до сигнала
-    print("Поток 2: получил сигнал, продолжаю работу")
+    print(f"Поток {name}: получил сигнал, продолжаю работу")
 
     for i in range(3):
         print(f"Поток {name}: итерацияxxx {i}")
@@ -101,19 +108,17 @@ def main():
     thread2.start()
 
     # Получить список всех активных потоков
+    print('')
     threads = threading.enumerate()
-
     print(f"Всего потоков: {len(threads)}")
     for thread in threads:
         print(f"  - {thread.name} (daemon: {thread.daemon})")
+    print('')
 
     # thread1.stop()        # останавливать обязательно - останавливаем в самом потоке
     # Ожидание завершения
     thread1.join()
     thread2.join()
-
-
-
 
     print("Все потоки завершены")
     print(f"Финальный результат: {my_result['data']}")
