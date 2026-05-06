@@ -239,7 +239,7 @@ while True:
 NumPort = port
 print("Выбран порт >> " + NumPort, end='')
 try:
-    counter_lf = 0  # число строк записанных ыв файл
+    counter_lf = 0  # число строк записанных в файл
     # Open the COM port
     SerPort = serial.Serial(NumPort, baudrate=115000)
     print(" >> Порт открыт")
@@ -259,10 +259,10 @@ try:
 #                        print('You Pressed A Key q!')                               # получается выйдем только после приёма строки
 #                        exit()
                     if (counter_lf < VOLUME_FILE):
-                        line = SerPort.read(NUMBER_READ_DATA_*2).hex()                                                  #чтение в Hex формате
+                        line = SerPort.read(NUMBER_READ_DATA_*2).hex()                                                  # чтение в Hex формате
                         if line:
                             pred_str = pre_str_time()
-                            if(len(pred_str) < 23):                                                                     #выровняем строку время, если она сокращена или неправильно считана - баг библиотеки
+                            if(len(pred_str) < 23):                                                                     # выровняем строку время, если она сокращена или неправильно считана - баг библиотеки
                                 pred_str = pred_str_old
                             else:
                                 pred_str_old = pred_str

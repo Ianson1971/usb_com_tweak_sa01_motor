@@ -2,6 +2,7 @@
 import my_com_port
 import my_strings
 import threading
+import queue
 import time
 import os
 
@@ -10,10 +11,11 @@ VERSION_MY_PO = 'v.0.0.1  05.05.26'                                             
 
 # поток с кооперативным завершением(рекомендуется)
 class StoppableThread(threading.Thread):
-    def __init__(self, name, param, event, result):
+    def __init__(self, name, param, event, queue, result):
         super().__init__()
         self._stop_event = threading.Event()
         self.event = event
+        self.queue = queue
         self.result = result
         self.name = name
         self.param = param
@@ -21,7 +23,7 @@ class StoppableThread(threading.Thread):
     def run(self):
         while not self._stop_event.is_set():
             # Ваш код
-            worker1(self.name, self.param, self.event, self.result)
+            worker1(self.name, self.param, self.event, self.queue, self.result)
             time.sleep(0.1)
             self.stop()                                                     # остановим поток
         print(f'Поток {self.name}: завершился корректно')
@@ -33,7 +35,7 @@ class StoppableThread(threading.Thread):
 
 
 
-def worker1(name, delay, event, result_container):
+def worker1(name, delay, event, queue, result_container):
     """Функция, которая будет выполняться в потоке"""
     # for i in range(3):
     #     list_port = my_com_port.Search_port()
@@ -62,26 +64,36 @@ def worker1(name, delay, event, result_container):
         os._exit(0)  # Немедленно завершает весь процесс
     print("Выбран порт >> " + NumPort, end='')
 
-    my_com_port.Open_Port(NumPort)
+    SerPort = my_com_port.Open_Port(NumPort)
 
     result_container['data'] = 42
     print(f"\nПоток {name}: работа завершена, данные готовы")
+
+    data = f"Сообщение {i} от {name}"
+    queue.put(data)  # Отправляем данные
+
     event.set()  # Сигнализируем о готовности
 
 
 
 
-def worker2(name, delay, event):
-    """Функция, которая будет выполняться в потоке"""
+def worker2(name, delay, event, queue):
+    """Функция, которая будет выполняться в потоке - читать ComPort"""
 
     """Второй поток - ждет результат"""
     print(f"Поток {name}: ожидаю данные от потока 1...")
     event.wait()  # Блокируется до сигнала
     print(f"Поток {name}: получил сигнал, продолжаю работу")
+    # while True:
+    #     my_com_port.Read_Port(SerPort)
 
-    for i in range(3):
-        print(f"Поток {name}: итерацияxxx {i}")
-        time.sleep(delay)
+    while True:
+        data = queue.get()  # Получаем данные (блокируется, если пусто)
+        if data is None:  # Проверка сигнала завершения
+            break
+        print(f"[{name}] Получил: {data}")
+        # Обработка данных...
+        time.sleep(0.5)
 
 
 
@@ -97,11 +109,12 @@ def main():
 
     my_event = threading.Event()        # общее событие
     my_result = {}                      # словарь
+    data_queue = queue.Queue()
 
     # Создание потоков
     # thread1 = threading.Thread(target=worker1, args=("A", 1))
-    thread1 = StoppableThread('A', 1, my_event, my_result)
-    thread2 = threading.Thread(target=worker2, args=("B", 1.5, my_event))
+    thread1 = StoppableThread('A', 1, my_event, data_queue, my_result)
+    thread2 = threading.Thread(target=worker2, args=("B", 1.5, data_queue, my_event))
 
     # Запуск потоков
     thread1.start()

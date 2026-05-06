@@ -45,43 +45,74 @@ def  Selection_Port(port_list) :
             break
     return port
 
-def Open_Port(port) :
+def Open_Port(port, baudrate=115200, timeout=1):
+    """
+    Открытие COM-порта с обработкой ошибок
+
+    Args:
+        port: Имя порта (например, 'COM3')
+        baudrate: Скорость передачи (по умолчанию 115200)
+        timeout: Таймаут чтения в секундах (по умолчанию 1)
+
+    Returns:
+        serial.Serial: Объект порта или None при ошибке
+    """
     try:
-        # Open the COM port
-        # SerPort = serial.Serial(port, baudrate=115000)
-        # print(" >> Порт открыт")
+        # Открываем порт с таймаутом (важно!)
+        ser = serial.Serial(
+            port=port,
+            baudrate=baudrate,
+            timeout=timeout,  # Защита от зависания
+            write_timeout=timeout  # Таймаут для записи
+        )
 
-        # keyboard.add_hotkey('q', on_exit)  # грячая клавиша для выхода
-        # keyboard.add_hotkey('ctrl + alt + x', lambda: print('ctrl + alt + x waspressed'))
+        # Проверяем, что порт действительно открыт
+        if ser.is_open:
+            print(f"✅ Порт {port} успешно открыт на скорости {baudrate} бод")
+            return ser
+        else:
+            print(f"⚠️ Порт {port} не открылся по неизвестной причине")
+            return None
 
-        with serial.Serial(port, baudrate=115000, timeout=1, exclusive=True) as ser:
-            print(f" >> Порт {ser.port} успешно открыт на {ser.baudrate} бод.")
-            # Здесь можно выполнять чтение и запись, например:
-            # ser.write(b'Hello')
-            # data = ser.readline()
-            # print(data)
-
-        # Блок 'with' автоматически закроет порт при выходе
-        print(f" >> Порт {port} закрыт.")
-
-    # 3. Обработка специфичных исключений pySerial
     except serial.SerialException as e:
-        # Это "родительское" исключение для большинства проблем с портом[citation:3]
-        # Оно может означать:
-        # - Порт не существует[citation:5]
-        # - Отказано в доступе (порт уже открыт другим приложением)[citation:1][citation:6]
-        # # - Ошибка драйвера или оборудования[citation:5]
-        print(f"❌ Ошибка при открытии порта '{port}': {e}")
+        error_msg = str(e)
+        print(f"❌ Ошибка при открытии порта '{port}': {error_msg}")
 
-        # Дополнительная диагностика для частой ошибки "отказано в доступе"
-        if "Access is denied" in str(e) or "PermissionError" in str(e):
-            print(
-                "   Совет: Убедитесь, что порт не используется другой программой (например, Arduino IDE, терминалом Putty).")
+        # Диагностика частых проблем
+        if "Access is denied" in error_msg or "PermissionError" in error_msg:
+            print("   💡 Совет: Порт уже используется другой программой")
+            print("   Закройте Arduino IDE, монитор порта, Putty или другие приложения")
+        elif "FileNotFoundError" in error_msg or "not found" in error_msg:
+            print(f"   💡 Совет: Порт {port} не существует")
+            # Показать доступные порты
+            available_ports = [p.device for p in serial.tools.list_ports.comports()]
+            if available_ports:
+                print(f"   Доступные порты: {available_ports}")
+            else:
+                print("   Нет доступных COM-портов. Проверьте подключение устройства")
+        elif "could not open port" in error_msg.lower():
+            print("   💡 Совет: Проверьте права доступа к порту")
+            print("   На Linux: sudo usermod -a -G dialout $USER")
+        else:
+            print(f"   💡 Неизвестная ошибка: {error_msg}")
 
-    # 4. Обработка ошибок, связанных с таймаутом (например, при записи)
+        return None
+
     except serial.SerialTimeoutException as e:
-        print(f"❌ Операция с портом '{port}' превысила таймаут: {e}")
-
+        print(f"❌ Таймаут при открытии порта '{port}': {e}")
+        print("   💡 Совет: Проверьте, отвечает ли устройство")
+        return None
 
     except Exception as e:
-        print(f"❌ Произошла непредвиденная ошибка: {e}")
+        print(f"❌ Непредвиденная ошибка при открытии порта '{port}': {e}")
+        print(f"   Тип ошибки: {type(e).__name__}")
+        return None
+
+
+
+
+# чтение из порта
+def Read_Port(ser):
+    if ser.is_open:
+        line = ser.read(my_strings.NUMBER_READ_DATA_*2).hex()                                                           # чтение в Hex формате
+        print("Received:", line, end='')
