@@ -1,6 +1,99 @@
 import serial
 import serial.tools.list_ports
 import my_strings
+import time
+import os
+import threading
+from queue import Queue
+
+## Использование класса-обертки (лучшая практика) ______________________________________
+class SerialManager:
+    """Централизованное управление serial портом"""
+
+    def __init__(self, port='COM1', baudrate=115200, timeout=1):
+
+        list_port = Search_port()
+        if not list_port:
+            print("портов не обнаружено")
+        NumPort = Selection_Port(list_port)
+        if not NumPort:
+            print("порт не выбран")
+            print("Завершаем процесс!")
+            time.sleep(3)
+            os._exit(0)  # Немедленно завершает весь процесс
+        print("Выбран порт >> " + NumPort, end='')
+
+        # self.ser = serial.Serial(port, baudrate, timeout=timeout)
+        self.ser = Open_Port(NumPort)       # объект Com порта
+        self.lock = threading.Lock()
+        self._stop_event = threading.Event()
+        self.read_queue = Queue()
+
+    def write(self, data):
+        """Безопасная запись в порт"""
+        with self.lock:
+            self.ser.write(data)
+
+    def read(self):
+        """Безопасное чтение из порта"""
+        with self.lock:
+            if self.ser.in_waiting:
+                line = self.ser.read(my_strings.NUMBER_READ_DATA_ * 2).hex()  # чтение в Hex формате
+                # print("Received:", line, end='')
+                print(f"Received: {line}")
+                return line
+                # return self.ser.readline()
+        return None
+
+    def start_reader(self):
+        """Запуск потока для чтения"""
+
+        def reader_worker():
+            while not self._stop_event.is_set():
+                data = self.read()
+                if data:
+                    self.read_queue.put(data)
+                time.sleep(0.01)
+
+        self.reader_thread = threading.Thread(target=reader_worker, daemon=True)
+        self.reader_thread.start()
+
+    def get_data(self, timeout=None):
+        """Получить данные из очереди"""
+        try:
+            return self.read_queue.get(timeout=timeout)
+        except:
+            return None
+
+    def stop(self):
+        self._stop_event.set()
+        if hasattr(self, 'reader_thread'):
+            self.reader_thread.join(timeout=2)
+        self.ser.close()
+
+
+
+# Использование в разных потоках
+def thread_a(serial_mgr):
+    # while True :
+    #     time.sleep(0.5)
+    time.sleep(5)   # 5 секунд
+
+
+    # for i in range(5):
+    #     serial_mgr.write(f"Thread A: {i}\n".encode())
+    #     time.sleep(0.5)
+
+def thread_b(serial_mgr):
+    # serial_mgr.start_reader()
+
+    while True :
+        data = serial_mgr.get_data(timeout=1)
+        if data:
+            data = my_strings.Str_Modification(data)
+            print(f"Thread B получил: {data}")
+        time.sleep(0.01)    # а это время на прием
+
 
 
 ## поиск портов _________________________________________________
@@ -45,7 +138,8 @@ def  Selection_Port(port_list) :
             break
     return port
 
-def Open_Port(port, baudrate=115200, timeout=1):
+## откроем порт
+def Open_Port(port, baudrate=115200, timeout=1): # timeout=1 - при чтении ждем 1 секунду чего нибудь и потом идём далее(не блокируем)
     """
     Открытие COM-порта с обработкой ошибок
 
@@ -116,3 +210,27 @@ def Read_Port(ser):
     if ser.is_open:
         line = ser.read(my_strings.NUMBER_READ_DATA_*2).hex()                                                           # чтение в Hex формате
         print("Received:", line, end='')
+
+
+
+def main():
+    ## тело модуля _________________________________________________
+
+    # Создаем менеджер
+    serial_mgr = SerialManager()
+    serial_mgr.start_reader()
+
+    # Запускаем потоки
+    t1 = threading.Thread(target=thread_a, args=(serial_mgr,))
+    t2 = threading.Thread(target=thread_b, args=(serial_mgr,))
+
+    t1.start()
+    t2.start()
+
+    t1.join()
+    t2.join()
+    serial_mgr.stop()
+
+
+if __name__ == "__main__":
+    main()
